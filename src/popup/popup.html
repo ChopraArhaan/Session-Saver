@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Session Saver</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="brand">
+          <img
+            src="../icons/icon48.png"
+            alt="Session Saver Logo"
+            class="brand-icon"
+            width="24"
+            height="24"
+          />
+          <h1 class="brand-title">Session Saver</h1>
+        </div>
+      </header>
+
+      <!-- Notification Toast / Feedback Banner -->
+      <div
+        id="statusMessage"
+        class="status-banner"
+        role="status"
+        aria-live="polite"
+      ></div>
+
+      <!-- Save Session Form -->
+      <section class="save-section" aria-label="Save current session">
+        <div class="input-group">
+          <input
+            type="text"
+            id="sessionNameInput"
+            class="input-field"
+            placeholder="Session name (optional)..."
+            maxlength="60"
+            autocomplete="off"
+          />
+          <button
+            id="saveBtn"
+            class="btn btn-primary"
+            type="button"
+            title="Save open tabs"
+          >
+            <svg
+              class="btn-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              width="16"
+              height="16"
+            >
+              <path
+                d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l6-6a1 1 0 00-1.414-1.414L11 12.586l-2.293-2.293z"
+              />
+              <path
+                d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7.414A2 2 0 0016.414 6L14 3.586A2 2 0 0012.586 3H5zm7 2v2H6V5h6z"
+              />
+            </svg>
+            <span>Save</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Saved Sessions Container -->
+      <section class="sessions-section" aria-label="Saved sessions list">
+        <div class="section-header">
+          <h2 class="section-title">Saved Sessions</h2>
+          <span id="sessionCounter" class="badge">0</span>
+        </div>
+
+        <!-- Dynamic Sessions List -->
+        <div id="sessionsList" class="sessions-list" role="list"></div>
+      </section>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
