@@ -119,6 +119,13 @@ Contributions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) f
 
 ---
 
+## 👤 Author
+
+**Arhaan Chopra**
+- GitHub: [@chopraArhaan](https://github.com/chopraArhaan)
+
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
