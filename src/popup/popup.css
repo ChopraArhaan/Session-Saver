@@ -293,3 +293,56 @@ body::-webkit-scrollbar-thumb {
   font-weight: 600;
   color: var(--brand-primary);
 }
+
+/* Session Actions */
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: #cbd5e1;
+}
+
+.btn-restore {
+  background-color: var(--brand-primary-light);
+  color: var(--brand-primary);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.btn-restore:hover {
+  background-color: #e0e7ff;
+  color: var(--brand-primary-hover);
+}
+
+.btn-delete {
+  padding: 4px 6px;
+  color: var(--text-muted);
+}
+
+.btn-delete:hover {
+  background-color: #fef2f2;
+  color: var(--status-error-text);
+  border-color: var(--status-error-border);
+}
