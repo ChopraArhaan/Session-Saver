@@ -37,6 +37,57 @@
   --radius-lg: 12px;
 }
 
+/* ==========================================================================
+   Dark Theme - System prefers-color-scheme
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #1e293b;
+    --bg-hover: #334155;
+    --bg-subtle: #0f172a;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+
+    --brand-primary: #6366f1;
+    --brand-primary-hover: #818cf8;
+    --brand-primary-light: rgba(99, 102, 241, 0.22);
+
+    --border-subtle: #334155;
+    --border-focus: #818cf8;
+
+    --status-success-bg: rgba(6, 95, 70, 0.25);
+    --status-success-text: #6ee7b7;
+    --status-success-border: rgba(16, 185, 129, 0.35);
+
+    --status-error-bg: rgba(153, 27, 27, 0.25);
+    --status-error-text: #fca5a5;
+    --status-error-border: rgba(239, 68, 68, 0.35);
+
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+  }
+
+  .session-card:hover {
+    border-color: #475569;
+  }
+
+  .btn-action:hover {
+    border-color: #475569;
+  }
+
+  .btn-restore:hover {
+    background-color: rgba(99, 102, 241, 0.32);
+  }
+
+  .btn-delete:hover {
+    background-color: rgba(239, 68, 68, 0.18);
+  }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
