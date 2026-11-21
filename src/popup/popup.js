@@ -4,7 +4,9 @@
  * Imports logic from sessions.js and handles user interactions:
  * - Loading and rendering saved sessions
  * - Capturing and saving active tabs
- * - Displaying friendly UI feedback banners
+ * - Expanding sessions to preview individual tabs with favicons & titles
+ * - Live real-time search filtering
+ * - Displaying friendly UI feedback banners & empty states
  */
 
 import {
@@ -20,8 +22,13 @@ const saveBtn = document.getElementById('saveBtn');
 const sessionsList = document.getElementById('sessionsList');
 const sessionCounter = document.getElementById('sessionCounter');
 const statusMessage = document.getElementById('statusMessage');
+const searchInput = document.getElementById('searchInput');
 
+// State
+let allSessions = [];
+let searchQuery = '';
 let messageTimeout = null;
+const expandedSessionIds = new Set();
 
 /**
  * Shows an accessible, friendly status message in the UI banner.
@@ -63,34 +70,140 @@ function formatSessionDate(isoString) {
 }
 
 /**
- * Renders the session list.
- * Safely sanitizes text output using textContent to prevent XSS.
+ * Creates a generic fallback favicon element.
  *
- * @param {Array<Object>} sessions - Sessions to display.
+ * @returns {SVGElement} Safe SVG globe icon.
  */
-function renderSessions(sessions = []) {
-  sessionCounter.textContent = String(sessions.length);
+function createFallbackFavicon() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'tab-favicon tab-favicon-fallback');
+  svg.setAttribute('viewBox', '0 0 20 20');
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('width', '14');
+  svg.setAttribute('height', '14');
+  svg.innerHTML =
+    '<path fill-rule="evenodd" d="M4.083 9h11.834a8 8 0 01-1.144 6.273A8.006 8.006 0 0110 18a8.006 8.006 0 01-4.773-2.727A8 8 0 014.083 9zm.28-2a7.97 7.97 0 011.66-3.879A7.994 7.994 0 0110 2c1.78 0 3.395.58 4.707 1.558A7.97 7.97 0 0116.368 7H4.363zM10 4a6 6 0 00-1.87 5.706h3.74A6 6 0 0010 4z" clip-rule="evenodd"/>';
+  return svg;
+}
+
+/**
+ * Creates an empty state element when no sessions exist or search yields no matches.
+ *
+ * @param {'none'|'search'} type - Type of empty state.
+ * @param {string} [term=''] - Current search term.
+ * @returns {HTMLElement} Empty state container.
+ */
+function createEmptyState(type, term = '') {
+  const container = document.createElement('div');
+  container.className = 'empty-state';
+
+  const iconWrap = document.createElement('div');
+  iconWrap.className = 'empty-icon-wrap';
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.5');
+  svg.setAttribute('width', '32');
+  svg.setAttribute('height', '32');
+
+  const title = document.createElement('div');
+  title.className = 'empty-title';
+
+  const desc = document.createElement('div');
+  desc.className = 'empty-desc';
+
+  if (type === 'search') {
+    svg.innerHTML =
+      '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/><line x1="8" y1="11" x2="14" y2="11"/>';
+    title.textContent = 'No matching sessions';
+    desc.textContent = `No saved sessions matched "${term}".`;
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'btn-clear-search';
+    clearBtn.type = 'button';
+    clearBtn.textContent = 'Clear Search';
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      render();
+    });
+
+    iconWrap.appendChild(svg);
+    container.appendChild(iconWrap);
+    container.appendChild(title);
+    container.appendChild(desc);
+    container.appendChild(clearBtn);
+  } else {
+    svg.innerHTML =
+      '<path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M12 7v6m-3-3h6"/>';
+    title.textContent = 'No saved sessions yet';
+    desc.textContent =
+      'Click Save above to capture all your open tabs into a clean, restorable session!';
+
+    iconWrap.appendChild(svg);
+    container.appendChild(iconWrap);
+    container.appendChild(title);
+    container.appendChild(desc);
+  }
+
+  return container;
+}
+
+/**
+ * Renders the session list filtered by current search query.
+ * Safely sanitizes text output using textContent to prevent XSS.
+ */
+function render() {
+  const filtered = searchQuery
+    ? allSessions.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allSessions;
+
+  sessionCounter.textContent = String(allSessions.length);
   sessionsList.innerHTML = '';
 
-  if (sessions.length === 0) {
-    const emptyState = document.createElement('div');
-    emptyState.className = 'empty-state';
-    emptyState.textContent = 'No saved sessions yet.';
-    sessionsList.appendChild(emptyState);
+  // Handle empty states
+  if (allSessions.length === 0) {
+    sessionsList.appendChild(createEmptyState('none'));
     return;
   }
 
-  sessions.forEach((session) => {
+  if (filtered.length === 0) {
+    sessionsList.appendChild(createEmptyState('search', searchQuery));
+    return;
+  }
+
+  filtered.forEach((session) => {
+    const isExpanded = expandedSessionIds.has(session.id);
+
     const card = document.createElement('div');
-    card.className = 'session-card';
+    card.className = `session-card ${isExpanded ? 'expanded' : ''}`;
     card.setAttribute('role', 'listitem');
     card.dataset.id = session.id;
 
-    // Header container
+    // Header container (Clickable to toggle tab preview)
     const header = document.createElement('div');
     header.className = 'session-header';
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', String(isExpanded));
+    header.setAttribute('aria-label', `Toggle preview for ${session.name}`);
 
-    // Info container (Title + Meta)
+    // Left info container (Chevron + Title + Meta)
+    const headerMain = document.createElement('div');
+    headerMain.className = 'session-header-main';
+
+    // Chevron icon for accordion
+    const chevronSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chevronSvg.setAttribute('class', 'chevron-icon');
+    chevronSvg.setAttribute('viewBox', '0 0 20 20');
+    chevronSvg.setAttribute('fill', 'currentColor');
+    chevronSvg.setAttribute('width', '16');
+    chevronSvg.setAttribute('height', '16');
+    chevronSvg.innerHTML =
+      '<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>';
+
     const info = document.createElement('div');
     info.className = 'session-info';
 
@@ -120,20 +233,22 @@ function renderSessions(sessions = []) {
 
     info.appendChild(title);
     info.appendChild(meta);
-    header.appendChild(info);
+
+    headerMain.appendChild(chevronSvg);
+    headerMain.appendChild(info);
+    header.appendChild(headerMain);
 
     // Actions container (Restore & Delete)
     const actions = document.createElement('div');
     actions.className = 'session-actions';
 
-    // Restore button - opens tabs in a new browser window
+    // Restore button - opens all tabs in a new browser window
     const restoreBtn = document.createElement('button');
     restoreBtn.className = 'btn-action btn-restore';
     restoreBtn.type = 'button';
     restoreBtn.title = 'Restore session in a new window';
     restoreBtn.setAttribute('aria-label', `Restore session ${session.name}`);
 
-    // Create SVG icon safely
     const restoreSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     restoreSvg.setAttribute('viewBox', '0 0 20 20');
     restoreSvg.setAttribute('fill', 'currentColor');
@@ -184,9 +299,10 @@ function renderSessions(sessions = []) {
 
       try {
         await removeSession(session.id);
+        expandedSessionIds.delete(session.id);
         showStatus(`Deleted "${session.name}".`, 'success');
-        const updatedSessions = await getSessions();
-        renderSessions(updatedSessions);
+        allSessions = await getSessions();
+        render();
       } catch (err) {
         showStatus(err.message || 'Failed to delete session.', 'error');
       }
@@ -195,7 +311,75 @@ function renderSessions(sessions = []) {
     actions.appendChild(restoreBtn);
     actions.appendChild(deleteBtn);
     header.appendChild(actions);
+
+    // Toggle expand/collapse when header is clicked
+    const toggleExpand = () => {
+      if (expandedSessionIds.has(session.id)) {
+        expandedSessionIds.delete(session.id);
+      } else {
+        expandedSessionIds.add(session.id);
+      }
+      render();
+    };
+
+    header.addEventListener('click', toggleExpand);
+    header.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleExpand();
+      }
+    });
+
     card.appendChild(header);
+
+    // Tab preview list (Accordion body)
+    if (isExpanded && Array.isArray(session.tabs)) {
+      const tabsPreview = document.createElement('div');
+      tabsPreview.className = 'session-tabs-preview';
+      tabsPreview.setAttribute('role', 'list');
+
+      session.tabs.forEach((tab) => {
+        const tabItem = document.createElement('div');
+        tabItem.className = 'tab-preview-item';
+        tabItem.setAttribute('role', 'listitem');
+        tabItem.title = tab.url || '';
+
+        // Favicon handling with safe fallback
+        if (tab.favIconUrl && tab.favIconUrl.startsWith('http')) {
+          const img = document.createElement('img');
+          img.className = 'tab-favicon';
+          img.src = tab.favIconUrl;
+          img.alt = '';
+          img.width = 14;
+          img.height = 14;
+          img.onerror = () => {
+            img.replaceWith(createFallbackFavicon());
+          };
+          tabItem.appendChild(img);
+        } else {
+          tabItem.appendChild(createFallbackFavicon());
+        }
+
+        // Tab Title - strictly textContent to avoid XSS
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'tab-preview-title';
+        titleSpan.textContent = tab.title || tab.url || 'Untitled Tab';
+
+        tabItem.appendChild(titleSpan);
+
+        // Optional: Clicking a single tab opens it
+        tabItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (tab.url) {
+            chrome.tabs.create({ url: tab.url });
+          }
+        });
+
+        tabsPreview.appendChild(tabItem);
+      });
+
+      card.appendChild(tabsPreview);
+    }
 
     sessionsList.appendChild(card);
   });
@@ -206,7 +390,6 @@ function renderSessions(sessions = []) {
  */
 async function handleSaveSession() {
   const customName = sessionNameInput.value.trim();
-
   saveBtn.disabled = true;
 
   try {
@@ -214,9 +397,10 @@ async function handleSaveSession() {
     sessionNameInput.value = '';
     showStatus(`Saved "${newSession.name}" successfully!`, 'success');
 
-    // Refresh sessions list
-    const sessions = await getSessions();
-    renderSessions(sessions);
+    allSessions = await getSessions();
+    // Auto-expand newly saved session for instant confirmation
+    expandedSessionIds.add(newSession.id);
+    render();
   } catch (error) {
     showStatus(error.message || 'Failed to save session.', 'error');
   } finally {
@@ -225,25 +409,29 @@ async function handleSaveSession() {
 }
 
 /**
- * Loads all saved sessions on popup launch.
+ * Loads all saved sessions and registers event listeners.
  */
 async function init() {
   try {
-    const sessions = await getSessions();
-    renderSessions(sessions);
+    allSessions = await getSessions();
+    render();
   } catch (error) {
     console.error('Failed to initialize sessions:', error);
     showStatus('Could not load saved sessions.', 'error');
   }
 
-  // Event Listeners
+  // Save session listeners
   saveBtn.addEventListener('click', handleSaveSession);
-
-  // Allow pressing Enter in input to save
   sessionNameInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       handleSaveSession();
     }
+  });
+
+  // Search input live filtering
+  searchInput.addEventListener('input', (event) => {
+    searchQuery = event.target.value.trim();
+    render();
   });
 }
 
