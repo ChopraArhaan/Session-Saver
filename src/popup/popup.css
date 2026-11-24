@@ -233,6 +233,12 @@ body::-webkit-scrollbar-thumb {
   border: 1px solid var(--status-error-border);
 }
 
+.status-banner.info {
+  background-color: var(--brand-primary-light);
+  color: var(--text-primary);
+  border: 1px solid var(--brand-primary);
+}
+
 /* Save Input Section */
 .save-section {
   display: flex;

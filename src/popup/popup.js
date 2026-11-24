@@ -17,6 +17,7 @@ import {
   removeSession,
   renameSession,
   duplicateSession,
+  NoSavableTabsError,
 } from '../lib/sessions.js';
 import { exportSessionsAsJson, parseBackup } from '../lib/backup.js';
 import {
@@ -663,7 +664,11 @@ async function handleSaveSession() {
     render();
     updateStorageMeter();
   } catch (error) {
-    showStatus(error.message || 'Failed to save session.', 'error');
+    if (error instanceof NoSavableTabsError || error?.name === 'NoSavableTabsError') {
+      showStatus('No savable tabs in this window.', 'info');
+    } else {
+      showStatus(error.message || 'Failed to save session.', 'error');
+    }
   } finally {
     saveBtn.disabled = false;
   }
