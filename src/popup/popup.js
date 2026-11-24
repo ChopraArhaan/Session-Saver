@@ -16,7 +16,7 @@ import {
   removeSession,
 } from '../lib/sessions.js';
 import { exportSessionsAsJson, parseBackup } from '../lib/backup.js';
-import { addImportedSessions } from '../lib/storage.js';
+import { addImportedSessions, getSettings, saveSettings } from '../lib/storage.js';
 
 // DOM Elements
 const sessionNameInput = document.getElementById('sessionNameInput');
@@ -28,10 +28,12 @@ const searchInput = document.getElementById('searchInput');
 const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
 const importFileInput = document.getElementById('importFileInput');
+const autoSaveToggle = document.getElementById('autoSaveToggle');
 
 // State
 let allSessions = [];
 let searchQuery = '';
+let activeTypeFilter = 'all'; // 'all' | 'manual' | 'auto'
 let messageTimeout = null;
 const expandedSessionIds = new Set();
 
@@ -161,11 +163,22 @@ function createEmptyState(type, term = '') {
  * Safely sanitizes text output using textContent to prevent XSS.
  */
 function render() {
-  const filtered = searchQuery
-    ? allSessions.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : allSessions;
+  let filtered = allSessions;
 
-  sessionCounter.textContent = String(allSessions.length);
+  // Filter by session type (All / Manual / Auto-saved)
+  if (activeTypeFilter === 'manual') {
+    filtered = filtered.filter((s) => !s.auto);
+  } else if (activeTypeFilter === 'auto') {
+    filtered = filtered.filter((s) => s.auto === true);
+  }
+
+  if (searchQuery) {
+    filtered = filtered.filter((s) =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }
+
+  sessionCounter.textContent = String(filtered.length);
   sessionsList.innerHTML = '';
 
   // Handle empty states
@@ -235,6 +248,17 @@ function render() {
     meta.appendChild(tabBadge);
     meta.appendChild(dot);
     meta.appendChild(dateSpan);
+
+    // Auto-saved badge indicator
+    if (session.auto === true) {
+      const autoDot = document.createElement('span');
+      autoDot.textContent = '•';
+      const autoBadge = document.createElement('span');
+      autoBadge.className = 'badge-auto';
+      autoBadge.textContent = 'Auto';
+      meta.appendChild(autoDot);
+      meta.appendChild(autoBadge);
+    }
 
     info.appendChild(title);
     info.appendChild(meta);
@@ -501,6 +525,39 @@ async function init() {
     importBtn.addEventListener('click', () => importFileInput.click());
     importFileInput.addEventListener('change', handleImportFile);
   }
+
+  // Auto-save setting toggle
+  if (autoSaveToggle) {
+    try {
+      const settings = await getSettings();
+      autoSaveToggle.checked = Boolean(settings.autoSave);
+    } catch {
+      autoSaveToggle.checked = true;
+    }
+
+    autoSaveToggle.addEventListener('change', async () => {
+      try {
+        await saveSettings({ autoSave: autoSaveToggle.checked });
+        showStatus(
+          autoSaveToggle.checked ? 'Auto-save enabled.' : 'Auto-save disabled.',
+          'success',
+        );
+      } catch (err) {
+        showStatus(err.message || 'Failed to update auto-save setting.', 'error');
+      }
+    });
+  }
+
+  // Filter pills (All / Manual / Auto)
+  const filterPills = document.querySelectorAll('.filter-pill');
+  filterPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      activeTypeFilter = pill.dataset.filter || 'all';
+      render();
+    });
+  });
 }
 
 // Initialize when DOM is loaded
