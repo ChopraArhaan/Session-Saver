@@ -49,14 +49,23 @@ export function formatDefaultSessionName(date = new Date()) {
 
 /**
  * Queries all tabs in the active window and strips out restricted pages.
+ * Supports passing an explicit windowId or falls back to lastFocusedWindow in background workers.
  *
+ * @param {number} [windowId] - Optional specific window ID to query.
  * @returns {Promise<Array<Object>>} Filtered list of tab data.
  */
-export async function getCurrentWindowTabs() {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+export async function getCurrentWindowTabs(windowId) {
+  const queryInfo = typeof windowId === 'number' ? { windowId } : { currentWindow: true };
+
+  let tabs = await chrome.tabs.query(queryInfo);
+
+  // Fallback to lastFocusedWindow if currentWindow returned no tabs (service worker context)
+  if ((!tabs || tabs.length === 0) && queryInfo.currentWindow) {
+    tabs = await chrome.tabs.query({ lastFocusedWindow: true });
+  }
 
   // Filter out internal system pages and extract only needed attributes
-  const sanitizedTabs = tabs
+  const sanitizedTabs = (tabs || [])
     .filter((tab) => tab.url && !isRestrictedUrl(tab.url))
     .map((tab) => ({
       id: tab.id,
@@ -72,10 +81,11 @@ export async function getCurrentWindowTabs() {
  * Saves all valid tabs of the current window as a new session.
  *
  * @param {string} [customName] - Optional custom name provided by the user.
+ * @param {number} [windowId] - Optional specific window ID to save.
  * @returns {Promise<Object>} The newly created session object.
  */
-export async function saveCurrentSession(customName) {
-  const validTabs = await getCurrentWindowTabs();
+export async function saveCurrentSession(customName, windowId) {
+  const validTabs = await getCurrentWindowTabs(windowId);
 
   if (validTabs.length === 0) {
     throw new Error(
