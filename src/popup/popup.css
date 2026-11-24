@@ -153,6 +153,59 @@ body::-webkit-scrollbar-thumb {
   color: var(--text-primary);
 }
 
+/* Header Auto-Save Toggle Switch */
+.header-settings {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.toggle-control input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  width: 28px;
+  height: 16px;
+  background-color: var(--border-subtle);
+  border-radius: 999px;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.toggle-track::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.toggle-control input:checked + .toggle-track {
+  background-color: var(--brand-primary);
+}
+
+.toggle-control input:checked + .toggle-track::before {
+  transform: translateX(12px);
+}
+
 /* Notification Feedback Banner */
 .status-banner {
   display: none;
@@ -349,6 +402,12 @@ body::-webkit-scrollbar-thumb {
   padding: 0 2px;
 }
 
+.section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .section-title {
   font-size: 12.5px;
   font-weight: 600;
@@ -365,6 +424,60 @@ body::-webkit-scrollbar-thumb {
   color: var(--brand-primary);
   background-color: var(--brand-primary-light);
   border-radius: 999px;
+}
+
+/* Filter Pills (All / Manual / Auto) */
+.filter-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background-color: var(--bg-hover);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.filter-pill {
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.filter-pill:hover {
+  color: var(--text-primary);
+}
+
+.filter-pill.active {
+  background-color: var(--bg-card);
+  color: var(--brand-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Auto-saved indicator badge */
+.badge-auto {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #b45309;
+  background-color: #fef3c7;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+@media (prefers-color-scheme: dark) {
+  .badge-auto {
+    color: #fcd34d;
+    background-color: rgba(217, 119, 6, 0.22);
+  }
 }
 
 /* Sessions List */

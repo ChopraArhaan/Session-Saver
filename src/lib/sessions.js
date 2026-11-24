@@ -151,6 +151,47 @@ export async function removeSession(sessionId) {
 }
 
 /**
+ * Creates an auto-saved session object from an array of window tabs.
+ * Only creates a session if there are at least 2 valid, non-restricted tabs.
+ *
+ * @param {Array<Object>} tabs - Tab objects from the closing window.
+ * @param {Date} [date=new Date()] - Date to timestamp the session.
+ * @returns {Object|null} Formatted auto session object or null if < 2 restorable tabs.
+ */
+export function createAutoSession(tabs = [], date = new Date()) {
+  if (!Array.isArray(tabs)) {
+    return null;
+  }
+
+  const validTabs = tabs
+    .filter((tab) => tab && tab.url && !isRestrictedUrl(tab.url))
+    .map((tab) => ({
+      id: tab.id || Math.floor(Math.random() * 1000000),
+      title: tab.title || tab.url || 'Untitled Tab',
+      url: tab.url,
+      favIconUrl: tab.favIconUrl || '',
+    }));
+
+  // Require at least 2 restorable tabs
+  if (validTabs.length < 2) {
+    return null;
+  }
+
+  const dateStr = formatDefaultSessionName(date);
+  return {
+    id:
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `auto_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    name: `Auto-saved: ${dateStr}`,
+    createdAt: date.toISOString(),
+    tabCount: validTabs.length,
+    tabs: validTabs,
+    auto: true,
+  };
+}
+
+/**
  * Re-exports getSessions for convenient access.
  */
 export { getSessions };

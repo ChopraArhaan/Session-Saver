@@ -8,6 +8,17 @@
 // Key used to store the array of saved sessions in chrome.storage.local
 const STORAGE_KEY = 'session_saver_sessions';
 
+// Key used to store user settings in chrome.storage.local
+export const SETTINGS_KEY = 'session_saver_settings';
+
+// Key used to persist in-flight window tab snapshots across service worker restarts
+export const SNAPSHOTS_KEY = 'session_saver_window_snapshots';
+
+// Default settings
+export const DEFAULT_SETTINGS = {
+  autoSave: true,
+};
+
 /**
  * Retrieves all saved sessions from chrome.storage.local.
  *
@@ -118,5 +129,143 @@ export async function addImportedSessions(newSessions) {
   } catch (error) {
     console.error('Failed to merge imported sessions in storage:', error);
     throw new Error('Could not persist imported sessions.');
+  }
+}
+
+/**
+ * Pure function: filters an array of sessions to keep at most `maxAuto` (default 5)
+ * auto-saved sessions (where auto === true), while preserving ALL manually saved sessions.
+ *
+ * @param {Array<Object>} sessions - Sessions to prune.
+ * @param {number} [maxAuto=5] - Maximum number of auto-saved sessions to retain.
+ * @returns {Array<Object>} Pruned sessions list.
+ */
+export function pruneAutoSavedSessions(sessions = [], maxAuto = 5) {
+  if (!Array.isArray(sessions)) {
+    return [];
+  }
+  let autoCount = 0;
+  return sessions.filter((s) => {
+    if (s && s.auto === true) {
+      autoCount += 1;
+      return autoCount <= maxAuto;
+    }
+    return true;
+  });
+}
+
+/**
+ * Saves a new auto-saved session, retaining only the latest 5 auto-saved sessions.
+ * Never touches or removes manual sessions.
+ *
+ * @param {Object} session - The auto-saved session object (must have auto: true).
+ * @param {number} [maxAuto=5] - Max auto sessions to keep.
+ * @returns {Promise<Array<Object>>} Resolves to updated sessions array.
+ */
+export async function saveAutoSession(session, maxAuto = 5) {
+  if (!session || typeof session !== 'object') {
+    throw new Error('Invalid session payload provided.');
+  }
+
+  const existingSessions = await getSessions();
+  const withNewSession = [{ ...session, auto: true }, ...existingSessions];
+  const pruned = pruneAutoSavedSessions(withNewSession, maxAuto);
+
+  await chrome.storage.local.set({ [STORAGE_KEY]: pruned });
+  return pruned;
+}
+
+/**
+ * Retrieves extension settings from chrome.storage.local.
+ *
+ * @returns {Promise<Object>} Resolves to settings object with defaults.
+ */
+export async function getSettings() {
+  try {
+    const result = await chrome.storage.local.get([SETTINGS_KEY]);
+    return { ...DEFAULT_SETTINGS, ...(result[SETTINGS_KEY] || {}) };
+  } catch (error) {
+    console.error('Failed to read settings from storage:', error);
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+/**
+ * Updates extension settings in chrome.storage.local.
+ *
+ * @param {Object} newSettings - Partial or complete settings object.
+ * @returns {Promise<Object>} Resolves to full updated settings.
+ */
+export async function saveSettings(newSettings = {}) {
+  try {
+    const current = await getSettings();
+    const updated = { ...current, ...newSettings };
+    await chrome.storage.local.set({ [SETTINGS_KEY]: updated });
+    return updated;
+  } catch (error) {
+    console.error('Failed to save settings to storage:', error);
+    throw new Error('Could not save settings.');
+  }
+}
+
+/**
+ * Returns the storage area for lightweight window snapshots.
+ * Uses chrome.storage.session when available, otherwise falls back to chrome.storage.local.
+ */
+function getSnapshotStorageArea() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session) {
+    return chrome.storage.session;
+  }
+  return chrome.storage.local;
+}
+
+/**
+ * Retrieves all in-flight window tab snapshots.
+ *
+ * @returns {Promise<Object>} Map of windowId -> array of tabs.
+ */
+export async function getWindowSnapshots() {
+  try {
+    const area = getSnapshotStorageArea();
+    const result = await area.get([SNAPSHOTS_KEY]);
+    return result[SNAPSHOTS_KEY] && typeof result[SNAPSHOTS_KEY] === 'object'
+      ? result[SNAPSHOTS_KEY]
+      : {};
+  } catch (error) {
+    console.error('Failed to get window snapshots:', error);
+    return {};
+  }
+}
+
+/**
+ * Saves all in-flight window tab snapshots.
+ *
+ * @param {Object} snapshots - Map of windowId -> array of tabs.
+ */
+export async function setWindowSnapshots(snapshots = {}) {
+  try {
+    const area = getSnapshotStorageArea();
+    await area.set({ [SNAPSHOTS_KEY]: snapshots });
+  } catch (error) {
+    console.error('Failed to save window snapshots:', error);
+  }
+}
+
+/**
+ * Removes the snapshot for a specific closed window ID and returns its tabs.
+ *
+ * @param {number} windowId - The window ID to remove.
+ * @returns {Promise<Array<Object>|null>} The removed tabs snapshot, or null if none.
+ */
+export async function removeWindowSnapshot(windowId) {
+  try {
+    const snapshots = await getWindowSnapshots();
+    const removedTabs = snapshots[windowId] || null;
+    delete snapshots[windowId];
+    await setWindowSnapshots(snapshots);
+    return removedTabs;
+  } catch (error) {
+    console.error('Failed to remove window snapshot:', error);
+    return null;
   }
 }

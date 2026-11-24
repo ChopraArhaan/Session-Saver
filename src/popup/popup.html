@@ -20,6 +20,16 @@
           />
           <h1 class="brand-title">Session Saver</h1>
         </div>
+        <div class="header-settings">
+          <label
+            class="toggle-control"
+            title="Automatically save tabs when a window is closed"
+          >
+            <span class="toggle-text">Auto-save</span>
+            <input type="checkbox" id="autoSaveToggle" checked />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
       </header>
 
       <!-- Notification Toast / Feedback Banner -->
@@ -136,8 +146,17 @@
       <!-- Saved Sessions Container -->
       <section class="sessions-section" aria-label="Saved sessions list">
         <div class="section-header">
-          <h2 class="section-title">Saved Sessions</h2>
-          <span id="sessionCounter" class="badge">0</span>
+          <div class="section-header-left">
+            <h2 class="section-title">Saved Sessions</h2>
+            <span id="sessionCounter" class="badge">0</span>
+          </div>
+          <div class="filter-pills" role="tablist" aria-label="Filter sessions">
+            <button class="filter-pill active" data-filter="all" type="button">
+              All
+            </button>
+            <button class="filter-pill" data-filter="manual" type="button">Manual</button>
+            <button class="filter-pill" data-filter="auto" type="button">Auto</button>
+          </div>
         </div>
 
         <!-- Dynamic Sessions List -->
