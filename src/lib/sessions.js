@@ -5,7 +5,7 @@
  * and about: URLs), default session naming, session formatting, and restoration.
  */
 
-import { getSessions, saveSession, deleteSession } from './storage.js';
+import { getSessions, saveSession, deleteSession, setAllSessions } from './storage.js';
 
 // Internal browser pages that cannot or should not be reopened by extensions
 const RESTRICTED_URL_PREFIXES = ['chrome://', 'edge://', 'about:'];
@@ -138,6 +138,95 @@ export async function restoreSessionInNewWindow(session) {
   });
 
   return newWindow;
+}
+
+/**
+ * Restores all tabs of a session into the current active window.
+ *
+ * @param {Object} session - Session to restore.
+ * @returns {Promise<Array<chrome.tabs.Tab>>} Created tabs.
+ */
+export async function restoreSessionInCurrentWindow(session) {
+  if (!session || !Array.isArray(session.tabs) || session.tabs.length === 0) {
+    throw new Error('This session has no tabs to restore.');
+  }
+
+  const urls = session.tabs.map((tab) => tab.url).filter((url) => !isRestrictedUrl(url));
+
+  if (urls.length === 0) {
+    throw new Error('No valid URLs found in this session.');
+  }
+
+  const createdTabs = [];
+  for (const url of urls) {
+    const tab = await chrome.tabs.create({ url });
+    createdTabs.push(tab);
+  }
+
+  return createdTabs;
+}
+
+/**
+ * Renames an existing session by ID.
+ *
+ * @param {string} sessionId - ID of session to rename.
+ * @param {string} newName - New name to assign.
+ * @returns {Promise<Object>} Updated session object.
+ */
+export async function renameSession(sessionId, newName) {
+  if (!sessionId) {
+    throw new Error('A session ID is required to rename.');
+  }
+
+  const trimmed = typeof newName === 'string' ? newName.trim() : '';
+  if (!trimmed) {
+    throw new Error('Session name cannot be empty.');
+  }
+
+  const sessions = await getSessions();
+  const session = sessions.find((s) => s.id === sessionId);
+  if (!session) {
+    throw new Error('Session not found.');
+  }
+
+  session.name = trimmed;
+  await setAllSessions(sessions);
+  return session;
+}
+
+/**
+ * Duplicates an existing session by ID, assigning a fresh ID and " (Copy)" suffix.
+ *
+ * @param {string} sessionId - ID of session to duplicate.
+ * @returns {Promise<Object>} Newly created duplicate session object.
+ */
+export async function duplicateSession(sessionId) {
+  if (!sessionId) {
+    throw new Error('A session ID is required to duplicate.');
+  }
+
+  const sessions = await getSessions();
+  const session = sessions.find((s) => s.id === sessionId);
+  if (!session) {
+    throw new Error('Session not found.');
+  }
+
+  const newId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const duplicated = {
+    ...session,
+    id: newId,
+    name: `${session.name} (Copy)`,
+    createdAt: new Date().toISOString(),
+    tabs: session.tabs.map((tab) => ({ ...tab })),
+  };
+
+  const updatedSessions = [duplicated, ...sessions];
+  await setAllSessions(updatedSessions);
+  return duplicated;
 }
 
 /**

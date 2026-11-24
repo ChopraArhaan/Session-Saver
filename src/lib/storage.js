@@ -269,3 +269,54 @@ export async function removeWindowSnapshot(windowId) {
     return null;
   }
 }
+
+/**
+ * Calculates current bytes in use and percentage against Chrome's 10 MB local quota.
+ *
+ * @returns {Promise<{
+ *   bytesInUse: number,
+ *   quotaBytes: number,
+ *   percentage: number,
+ *   formatted: string
+ * }>} Usage breakdown.
+ */
+export async function getStorageUsage() {
+  try {
+    const quotaBytes =
+      typeof chrome !== 'undefined' &&
+      chrome.storage &&
+      chrome.storage.local &&
+      chrome.storage.local.QUOTA_BYTES
+        ? chrome.storage.local.QUOTA_BYTES
+        : 10 * 1024 * 1024;
+
+    let bytesInUse = 0;
+    if (
+      typeof chrome !== 'undefined' &&
+      chrome.storage &&
+      chrome.storage.local &&
+      typeof chrome.storage.local.getBytesInUse === 'function'
+    ) {
+      bytesInUse = await chrome.storage.local.getBytesInUse(null);
+    }
+
+    const percentage = Math.min(100, Math.round((bytesInUse / quotaBytes) * 100));
+    const kbUsed = (bytesInUse / 1024).toFixed(1);
+    const mbTotal = (quotaBytes / (1024 * 1024)).toFixed(0);
+
+    return {
+      bytesInUse,
+      quotaBytes,
+      percentage,
+      formatted: `${kbUsed} KB / ${mbTotal} MB (${percentage}%)`,
+    };
+  } catch (error) {
+    console.error('Failed to get storage usage:', error);
+    return {
+      bytesInUse: 0,
+      quotaBytes: 10485760,
+      percentage: 0,
+      formatted: '0.0 KB / 10 MB (0%)',
+    };
+  }
+}

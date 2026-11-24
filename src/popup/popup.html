@@ -162,6 +162,29 @@
         <!-- Dynamic Sessions List -->
         <div id="sessionsList" class="sessions-list" role="list"></div>
       </section>
+
+      <!-- Storage Usage Footer -->
+      <footer class="app-footer">
+        <div class="storage-meter">
+          <div class="storage-info">
+            <span class="storage-label">Local Storage</span>
+            <span id="storageUsageText" class="storage-value">0.0 KB / 10 MB (0%)</span>
+          </div>
+          <div
+            class="progress-bar-track"
+            role="progressbar"
+            aria-valuenow="0"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div
+              id="storageProgressBar"
+              class="progress-bar-fill"
+              style="width: 0%"
+            ></div>
+          </div>
+        </div>
+      </footer>
     </div>
 
     <script type="module" src="popup.js"></script>
