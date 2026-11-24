@@ -60,7 +60,8 @@ Save your active window tabs at any moment without opening the popup:
 ### Visual Feedback
 When you press the shortcut, the extension icon badge provides immediate visual confirmation:
 - **`✓` (Green)**: Session saved successfully.
-- **`!` (Red)**: Unable to save (e.g., all tabs in the window are restricted browser pages).
+- **`–` (Gray)**: No savable tabs in the active window (e.g., all open tabs are internal pages like `chrome://newtab`).
+- **`!` (Red)**: Unexpected error saving session.
 
 > 💡 **Customizing the Shortcut**: You can change this keyboard shortcut at any time by navigating to `chrome://extensions/shortcuts` in Google Chrome.
 

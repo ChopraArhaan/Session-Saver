@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded CI workflow to use `npm ci` and execute both `npm run lint` and `npm test`.
 - Hardened tab queries to seamlessly support both popup and service worker execution contexts.
 
+### Fixed
+- Keyboard shortcut now targets the correct window and no longer reports an error for windows with only internal pages.
+- Introduced `NoSavableTabsError` to distinguish expected empty tab conditions from unexpected runtime exceptions, displaying a neutral badge indicator (`–`) instead of an error.
+- Hardened keyboard shortcut window targeting in the background service worker by using `tab.windowId` and falling back to `chrome.windows.getLastFocused`.
+- Implemented single-timer tracking for badge notifications to prevent race conditions and collisions during rapid shortcut activations.
+- Ensured tab removal events ignore closing windows (`removeInfo.isWindowClosing`), preventing closing windows from being recorded as empty tab snapshots.
+
 ## [1.0.0] - 2026-11-22
 
 ### Added
