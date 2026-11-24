@@ -4,6 +4,19 @@
   "version": "1.0.0",
   "description": "Save, search, and restore your tab sessions in one click.",
   "permissions": ["tabs", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "commands": {
+    "save-session": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Save current window tabs as a session"
+    }
+  },
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
