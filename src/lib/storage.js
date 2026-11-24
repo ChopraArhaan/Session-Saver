@@ -78,3 +78,45 @@ export async function deleteSession(sessionId) {
     throw new Error('Could not delete session. Please try again.');
   }
 }
+
+/**
+ * Saves a full array of sessions, replacing existing list.
+ *
+ * @param {Array<Object>} sessions - Sessions array to persist.
+ * @returns {Promise<Array<Object>>} Resolves to the persisted sessions array.
+ */
+export async function setAllSessions(sessions) {
+  if (!Array.isArray(sessions)) {
+    throw new Error('Expected an array of sessions.');
+  }
+
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEY]: sessions });
+    return sessions;
+  } catch (error) {
+    console.error('Failed to save sessions to storage:', error);
+    throw new Error('Could not save sessions. Storage quota may be exceeded.');
+  }
+}
+
+/**
+ * Merges newly imported sessions into existing storage without overwriting.
+ *
+ * @param {Array<Object>} newSessions - Sessions to prepend/merge.
+ * @returns {Promise<Array<Object>>} Resolves to all sessions after merge.
+ */
+export async function addImportedSessions(newSessions) {
+  if (!Array.isArray(newSessions) || newSessions.length === 0) {
+    return await getSessions();
+  }
+
+  try {
+    const existingSessions = await getSessions();
+    const merged = [...newSessions, ...existingSessions];
+    await chrome.storage.local.set({ [STORAGE_KEY]: merged });
+    return merged;
+  } catch (error) {
+    console.error('Failed to merge imported sessions in storage:', error);
+    throw new Error('Could not persist imported sessions.');
+  }
+}

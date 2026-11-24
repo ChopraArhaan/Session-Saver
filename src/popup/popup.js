@@ -15,6 +15,8 @@ import {
   restoreSessionInNewWindow,
   removeSession,
 } from '../lib/sessions.js';
+import { exportSessionsAsJson, parseBackup } from '../lib/backup.js';
+import { addImportedSessions } from '../lib/storage.js';
 
 // DOM Elements
 const sessionNameInput = document.getElementById('sessionNameInput');
@@ -23,6 +25,9 @@ const sessionsList = document.getElementById('sessionsList');
 const sessionCounter = document.getElementById('sessionCounter');
 const statusMessage = document.getElementById('statusMessage');
 const searchInput = document.getElementById('searchInput');
+const exportBtn = document.getElementById('exportBtn');
+const importBtn = document.getElementById('importBtn');
+const importFileInput = document.getElementById('importFileInput');
 
 // State
 let allSessions = [];
@@ -409,6 +414,60 @@ async function handleSaveSession() {
 }
 
 /**
+ * Handles exporting all saved sessions to a JSON backup file.
+ */
+function handleExport() {
+  try {
+    const result = exportSessionsAsJson(allSessions);
+    showStatus(`Exported ${result.count} sessions to ${result.filename}!`, 'success');
+  } catch (error) {
+    showStatus(error.message || 'Failed to export sessions.', 'error');
+  }
+}
+
+/**
+ * Handles importing sessions from a user-selected JSON file.
+ *
+ * @param {Event} event - File input change event.
+ */
+async function handleImportFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const currentSessions = await getSessions();
+    const { importedSessions, stats } = parseBackup(text, currentSessions, file.size);
+
+    if (importedSessions.length === 0) {
+      showStatus('No valid sessions found in backup file.', 'error');
+      return;
+    }
+
+    // Merge into storage without overwriting existing sessions
+    await addImportedSessions(importedSessions);
+    allSessions = await getSessions();
+    render();
+
+    let feedback = `Imported ${stats.sessionsImported} ${
+      stats.sessionsImported === 1 ? 'session' : 'sessions'
+    } (${stats.tabsImported} tabs).`;
+
+    if (stats.sessionsSkipped > 0 || stats.tabsSkipped > 0) {
+      feedback += ` Skipped: ${stats.sessionsSkipped} invalid sessions, ${stats.tabsSkipped} invalid tabs.`;
+    }
+
+    showStatus(feedback, 'success');
+  } catch (error) {
+    showStatus(error.message || 'Failed to import backup file.', 'error');
+  } finally {
+    importFileInput.value = '';
+  }
+}
+
+/**
  * Loads all saved sessions and registers event listeners.
  */
 async function init() {
@@ -433,6 +492,15 @@ async function init() {
     searchQuery = event.target.value.trim();
     render();
   });
+
+  // Export & Import listeners
+  if (exportBtn) {
+    exportBtn.addEventListener('click', handleExport);
+  }
+  if (importBtn && importFileInput) {
+    importBtn.addEventListener('click', () => importFileInput.click());
+    importFileInput.addEventListener('change', handleImportFile);
+  }
 }
 
 // Initialize when DOM is loaded
