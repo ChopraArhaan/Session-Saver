@@ -11,6 +11,19 @@ import { getSessions, saveSession, deleteSession, setAllSessions } from './stora
 const RESTRICTED_URL_PREFIXES = ['chrome://', 'edge://', 'about:'];
 
 /**
+ * Error thrown when an active window does not contain any savable tabs
+ * (e.g., all tabs are internal chrome://, edge://, or about: pages).
+ */
+export class NoSavableTabsError extends Error {
+  constructor(
+    message = 'No valid tabs to save. Internal browser pages (chrome://, edge://, about:) cannot be saved.',
+  ) {
+    super(message);
+    this.name = 'NoSavableTabsError';
+  }
+}
+
+/**
  * Checks whether a given URL is a restricted browser internal page.
  *
  * @param {string} url - The URL string to test.
@@ -88,7 +101,7 @@ export async function saveCurrentSession(customName, windowId) {
   const validTabs = await getCurrentWindowTabs(windowId);
 
   if (validTabs.length === 0) {
-    throw new Error(
+    throw new NoSavableTabsError(
       'No valid tabs to save. Internal browser pages (chrome://, edge://, about:) cannot be saved.',
     );
   }

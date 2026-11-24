@@ -10,6 +10,7 @@ import {
   renameSession,
   duplicateSession,
   createAutoSession,
+  NoSavableTabsError,
 } from '../src/lib/sessions.js';
 import { getSessions } from '../src/lib/storage.js';
 
@@ -82,10 +83,11 @@ describe('sessions.js', () => {
       expect(session.name).toContain('2026');
     });
 
-    it('throws error if window contains zero valid tabs', async () => {
+    it('throws NoSavableTabsError if window contains zero valid tabs', async () => {
       mock.tabs._setTabs([
         { id: 1, title: 'Chrome', url: 'chrome://version', windowId: 2 },
       ]);
+      await expect(saveCurrentSession('Empty', 2)).rejects.toThrow(NoSavableTabsError);
       await expect(saveCurrentSession('Empty', 2)).rejects.toThrow(
         'Internal browser pages',
       );

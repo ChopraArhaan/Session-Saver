@@ -2,11 +2,37 @@
  * chromeMock.js - In-memory mock of Chrome Extension APIs for Vitest suites
  */
 
+export function createEventMock() {
+  const listeners = [];
+  return {
+    addListener(fn) {
+      listeners.push(fn);
+    },
+    removeListener(fn) {
+      const idx = listeners.indexOf(fn);
+      if (idx !== -1) {
+        listeners.splice(idx, 1);
+      }
+    },
+    hasListener(fn) {
+      return listeners.includes(fn);
+    },
+    getListeners: () => listeners,
+    async trigger(...args) {
+      for (const fn of [...listeners]) {
+        await fn(...args);
+      }
+    },
+  };
+}
+
 export function createChromeMock(initialData = {}) {
   let localStorageData = { ...(initialData.local || {}) };
   let sessionStorageData = { ...(initialData.session || {}) };
   let openTabs = [...(initialData.tabs || [])];
   let openWindows = [...(initialData.windows || [])];
+
+  const prev = globalThis.chrome;
 
   const storageLocal = {
     QUOTA_BYTES: 10485760,
@@ -79,8 +105,11 @@ export function createChromeMock(initialData = {}) {
     },
   };
 
+  const tabsQueries = [];
   const tabs = {
+    _queries: tabsQueries,
     async query(queryInfo = {}) {
+      tabsQueries.push({ ...queryInfo });
       return openTabs.filter((tab) => {
         if (queryInfo.currentWindow && tab.windowId !== 1) {
           return false;
@@ -107,6 +136,12 @@ export function createChromeMock(initialData = {}) {
     _setTabs(newTabs) {
       openTabs = [...newTabs];
     },
+    onCreated: prev?.tabs?.onCreated || createEventMock(),
+    onUpdated: prev?.tabs?.onUpdated || createEventMock(),
+    onRemoved: prev?.tabs?.onRemoved || createEventMock(),
+    onMoved: prev?.tabs?.onMoved || createEventMock(),
+    onAttached: prev?.tabs?.onAttached || createEventMock(),
+    onDetached: prev?.tabs?.onDetached || createEventMock(),
   };
 
   const windows = {
@@ -141,14 +176,43 @@ export function createChromeMock(initialData = {}) {
       }
       return [...openWindows];
     },
+    async getLastFocused() {
+      const focusedWin = openWindows.find((w) => w.focused);
+      if (focusedWin) {
+        return focusedWin;
+      }
+      return openWindows[0] || null;
+    },
     _setWindows(newWindows) {
       openWindows = [...newWindows];
     },
+    onRemoved: prev?.windows?.onRemoved || createEventMock(),
   };
 
+  let badgeText = '';
+  let badgeColor = '';
   const action = {
-    async setBadgeText() {},
-    async setBadgeBackgroundColor() {},
+    async setBadgeText(details = {}) {
+      badgeText = details.text ?? '';
+    },
+    async setBadgeBackgroundColor(details = {}) {
+      badgeColor = details.color ?? '';
+    },
+    _getBadgeText: () => badgeText,
+    _getBadgeColor: () => badgeColor,
+    _reset: () => {
+      badgeText = '';
+      badgeColor = '';
+    },
+  };
+
+  const commands = {
+    onCommand: prev?.commands?.onCommand || createEventMock(),
+  };
+
+  const runtime = {
+    onStartup: prev?.runtime?.onStartup || createEventMock(),
+    onInstalled: prev?.runtime?.onInstalled || createEventMock(),
   };
 
   const mock = {
@@ -159,6 +223,8 @@ export function createChromeMock(initialData = {}) {
     tabs,
     windows,
     action,
+    commands,
+    runtime,
     _getRawStorage: () => localStorageData,
   };
 
