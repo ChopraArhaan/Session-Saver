@@ -1,7 +1,8 @@
 # 🗂️ Session Saver
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Lint](https://github.com/chopraArhaan/session-saver/actions/workflows/lint.yml/badge.svg)](https://github.com/chopraArhaan/session-saver/actions/workflows/lint.yml)
+[![CI](https://github.com/ChopraArhaan/Session-Saver/actions/workflows/lint.yml/badge.svg)](https://github.com/ChopraArhaan/Session-Saver/actions/workflows/lint.yml)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/ChopraArhaan/Session-Saver/actions/workflows/lint.yml)
 
 > Save, search, and restore your tab sessions in one click. Clean, private, and lightweight tab management built for Manifest V3.
 

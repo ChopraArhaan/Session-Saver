@@ -6,13 +6,16 @@
   "license": "MIT",
   "author": "Arhaan Chopra",
   "scripts": {
-    "lint": "eslint src",
-    "format": "prettier --write src",
+    "lint": "eslint src tests",
+    "format": "prettier --write src tests",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "package": "cd src && zip -r ../session-saver.zip ."
   },
   "devDependencies": {
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "vitest": "^5.1.1"
   }
 }
