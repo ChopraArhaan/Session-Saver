@@ -42,8 +42,8 @@ Most session managers are bloated with trackers, require cloud accounts, or requ
 
 ## 📸 Screenshots
 
-| Light Mode | Dark Mode |
-| :---: | :---: |
+|                    Light Mode                    |                   Dark Mode                    |
+| :----------------------------------------------: | :--------------------------------------------: |
 | ![Popup Light](docs/screenshots/popup-light.png) | ![Popup Dark](docs/screenshots/popup-dark.png) |
 
 ---
@@ -52,13 +52,15 @@ Most session managers are bloated with trackers, require cloud accounts, or requ
 
 Save your active window tabs at any moment without opening the popup:
 
-| Platform | Default Shortcut |
-| :--- | :--- |
-| **Windows / Linux** | `Ctrl + Shift + S` |
-| **macOS** | `Command + Shift + S` |
+| Platform            | Default Shortcut      |
+| :------------------ | :-------------------- |
+| **Windows / Linux** | `Ctrl + Shift + S`    |
+| **macOS**           | `Command + Shift + S` |
 
 ### Visual Feedback
+
 When you press the shortcut, the extension icon badge provides immediate visual confirmation:
+
 - **`✓` (Green)**: Session saved successfully.
 - **`–` (Gray)**: No savable tabs in the active window (e.g., all open tabs are internal pages like `chrome://newtab`).
 - **`!` (Red)**: Unexpected error saving session.
@@ -113,6 +115,18 @@ Tests verify restricted URL filtering, default session naming, session saving, d
 
 ---
 
+## 📦 Packaging for Distribution
+
+Create a production-ready, compressed ZIP distribution for the Chrome Web Store:
+
+```bash
+npm run package
+```
+
+The cross-platform packaging script runs seamlessly on Windows, macOS, and Linux, generating `session-saver.zip` at the project root with `manifest.json` at the archive root.
+
+---
+
 ## 🛠️ Tech Stack
 
 - **Platform**: Chrome Extensions (Manifest V3)
@@ -127,12 +141,13 @@ Tests verify restricted URL filtering, default session naming, session saving, d
 
 Session Saver strictly adheres to the principle of least privilege. **No new permissions were added in v1.1.0:**
 
-| Permission | Justification |
-| :--- | :--- |
-| `tabs` | Required to read URLs, titles, and favicons of open tabs in the current window during saving, and create tabs during window/tab restoration. |
-| `storage` | Required to persist your saved session collections, rolling window recovery snapshots, and user preferences locally via `chrome.storage.local`. |
+| Permission | Justification                                                                                                                                   |
+| :--------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tabs`     | Required to read URLs, titles, and favicons of open tabs in the current window during saving, and create tabs during window/tab restoration.    |
+| `storage`  | Required to persist your saved session collections, rolling window recovery snapshots, and user preferences locally via `chrome.storage.local`. |
 
 ### Why Other Features Require No Extra Permissions
+
 - **Keyboard Shortcut**: Declared via the Manifest V3 `commands` API (requires zero permissions).
 - **Toolbar Badge**: Uses the standard Manifest V3 `chrome.action` API (requires zero permissions).
 - **Window Management**: Window creation and querying use `chrome.windows` (available by default in MV3).
@@ -211,6 +226,7 @@ Session Saver collects zero personal data and performs zero network requests. Re
 ## 👤 Author
 
 **Arhaan Chopra**
+
 - GitHub: [@ChopraArhaan](https://github.com/ChopraArhaan)
 
 ---
