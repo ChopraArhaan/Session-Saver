@@ -13,10 +13,18 @@ import {
   saveCurrentSession,
   getSessions,
   restoreSessionInNewWindow,
+  restoreSessionInCurrentWindow,
   removeSession,
+  renameSession,
+  duplicateSession,
 } from '../lib/sessions.js';
 import { exportSessionsAsJson, parseBackup } from '../lib/backup.js';
-import { addImportedSessions, getSettings, saveSettings } from '../lib/storage.js';
+import {
+  addImportedSessions,
+  getSettings,
+  saveSettings,
+  getStorageUsage,
+} from '../lib/storage.js';
 
 // DOM Elements
 const sessionNameInput = document.getElementById('sessionNameInput');
@@ -29,6 +37,8 @@ const exportBtn = document.getElementById('exportBtn');
 const importBtn = document.getElementById('importBtn');
 const importFileInput = document.getElementById('importFileInput');
 const autoSaveToggle = document.getElementById('autoSaveToggle');
+const storageUsageText = document.getElementById('storageUsageText');
+const storageProgressBar = document.getElementById('storageProgressBar');
 
 // State
 let allSessions = [];
@@ -73,6 +83,30 @@ function formatSessionDate(isoString) {
     });
   } catch {
     return 'Recently';
+  }
+}
+
+/**
+ * Updates the storage usage progress bar and text in the footer.
+ */
+async function updateStorageMeter() {
+  if (!storageUsageText || !storageProgressBar) {
+    return;
+  }
+
+  try {
+    const usage = await getStorageUsage();
+    storageUsageText.textContent = usage.formatted;
+    storageProgressBar.style.width = `${usage.percentage}%`;
+    storageProgressBar.setAttribute('aria-valuenow', String(usage.percentage));
+
+    if (usage.percentage >= 80) {
+      storageProgressBar.classList.add('warning');
+    } else {
+      storageProgressBar.classList.remove('warning');
+    }
+  } catch (error) {
+    console.error('Failed to update storage meter:', error);
   }
 }
 
@@ -267,16 +301,124 @@ function render() {
     headerMain.appendChild(info);
     header.appendChild(headerMain);
 
-    // Actions container (Restore & Delete)
+    // Actions container (Restore, Rename, Duplicate, Delete)
     const actions = document.createElement('div');
     actions.className = 'session-actions';
 
-    // Restore button - opens all tabs in a new browser window
+    // Rename button - triggers inline editing of session name
+    const renameBtn = document.createElement('button');
+    renameBtn.className = 'btn-action btn-rename';
+    renameBtn.type = 'button';
+    renameBtn.title = 'Rename session';
+    renameBtn.setAttribute('aria-label', `Rename session ${session.name}`);
+
+    const renameSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    renameSvg.setAttribute('viewBox', '0 0 20 20');
+    renameSvg.setAttribute('fill', 'currentColor');
+    renameSvg.setAttribute('width', '13');
+    renameSvg.setAttribute('height', '13');
+    renameSvg.innerHTML =
+      '<path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>';
+    renameBtn.appendChild(renameSvg);
+
+    let isEditing = false;
+    renameBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (isEditing) return;
+      isEditing = true;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'input-inline-rename';
+      input.value = session.name;
+      input.maxLength = 60;
+
+      const commitRename = async () => {
+        if (!isEditing) return;
+        isEditing = false;
+        const newName = input.value.trim();
+        if (newName && newName !== session.name) {
+          try {
+            await renameSession(session.id, newName);
+            showStatus(`Renamed to "${newName}".`, 'success');
+            allSessions = await getSessions();
+            render();
+          } catch (err) {
+            showStatus(err.message || 'Failed to rename session.', 'error');
+            title.textContent = session.name;
+            input.replaceWith(title);
+          }
+        } else {
+          input.replaceWith(title);
+        }
+      };
+
+      const cancelRename = () => {
+        if (!isEditing) return;
+        isEditing = false;
+        input.replaceWith(title);
+      };
+
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commitRename();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelRename();
+        }
+      });
+      input.addEventListener('blur', () => {
+        commitRename();
+      });
+
+      title.replaceWith(input);
+      input.focus();
+      input.select();
+    });
+
+    // Duplicate button - creates an identical copy of the session
+    const duplicateBtn = document.createElement('button');
+    duplicateBtn.className = 'btn-action btn-duplicate';
+    duplicateBtn.type = 'button';
+    duplicateBtn.title = 'Duplicate session';
+    duplicateBtn.setAttribute('aria-label', `Duplicate session ${session.name}`);
+
+    const duplicateSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    duplicateSvg.setAttribute('viewBox', '0 0 20 20');
+    duplicateSvg.setAttribute('fill', 'currentColor');
+    duplicateSvg.setAttribute('width', '13');
+    duplicateSvg.setAttribute('height', '13');
+    duplicateSvg.innerHTML =
+      '<path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z"/><path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z"/>';
+    duplicateBtn.appendChild(duplicateSvg);
+
+    duplicateBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      try {
+        const dup = await duplicateSession(session.id);
+        showStatus(`Duplicated as "${dup.name}".`, 'success');
+        allSessions = await getSessions();
+        render();
+        updateStorageMeter();
+      } catch (err) {
+        showStatus(err.message || 'Failed to duplicate session.', 'error');
+      }
+    });
+
+    // Split Restore button group (New window vs Current window)
+    const restoreGroup = document.createElement('div');
+    restoreGroup.className = 'restore-group';
+
     const restoreBtn = document.createElement('button');
-    restoreBtn.className = 'btn-action btn-restore';
+    restoreBtn.className = 'btn-action btn-restore btn-restore-main';
     restoreBtn.type = 'button';
-    restoreBtn.title = 'Restore session in a new window';
-    restoreBtn.setAttribute('aria-label', `Restore session ${session.name}`);
+    restoreBtn.title = 'Restore session in a new window (default)';
+    restoreBtn.setAttribute(
+      'aria-label',
+      `Restore session ${session.name} in new window`,
+    );
 
     const restoreSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     restoreSvg.setAttribute('viewBox', '0 0 20 20');
@@ -301,6 +443,69 @@ function render() {
         showStatus(err.message || 'Failed to restore session.', 'error');
       }
     });
+
+    // Restore choice dropdown toggle
+    const restoreArrowBtn = document.createElement('button');
+    restoreArrowBtn.className = 'btn-action btn-restore btn-restore-arrow';
+    restoreArrowBtn.type = 'button';
+    restoreArrowBtn.title = 'Restore options';
+    restoreArrowBtn.setAttribute('aria-label', `Restore choices for ${session.name}`);
+    restoreArrowBtn.setAttribute('aria-haspopup', 'true');
+    restoreArrowBtn.setAttribute('aria-expanded', 'false');
+    restoreArrowBtn.innerHTML =
+      '<svg viewBox="0 0 20 20" fill="currentColor" width="10" height="10"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
+
+    const restoreMenu = document.createElement('div');
+    restoreMenu.className = 'restore-menu';
+    restoreMenu.setAttribute('role', 'menu');
+
+    const itemNewWindow = document.createElement('button');
+    itemNewWindow.className = 'restore-menu-item';
+    itemNewWindow.setAttribute('role', 'menuitem');
+    itemNewWindow.textContent = 'New Window';
+    itemNewWindow.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      restoreMenu.classList.remove('open');
+      restoreArrowBtn.setAttribute('aria-expanded', 'false');
+      try {
+        await restoreSessionInNewWindow(session);
+        showStatus(`Restored "${session.name}" in a new window!`, 'success');
+      } catch (err) {
+        showStatus(err.message || 'Failed to restore session.', 'error');
+      }
+    });
+
+    const itemCurrentWindow = document.createElement('button');
+    itemCurrentWindow.className = 'restore-menu-item';
+    itemCurrentWindow.setAttribute('role', 'menuitem');
+    itemCurrentWindow.textContent = 'Current Window';
+    itemCurrentWindow.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      restoreMenu.classList.remove('open');
+      restoreArrowBtn.setAttribute('aria-expanded', 'false');
+      try {
+        await restoreSessionInCurrentWindow(session);
+        showStatus(`Restored "${session.name}" in current window!`, 'success');
+      } catch (err) {
+        showStatus(err.message || 'Failed to restore session.', 'error');
+      }
+    });
+
+    restoreMenu.appendChild(itemNewWindow);
+    restoreMenu.appendChild(itemCurrentWindow);
+
+    restoreArrowBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const isOpen = restoreMenu.classList.toggle('open');
+      restoreArrowBtn.setAttribute('aria-expanded', String(isOpen));
+      document.querySelectorAll('.restore-menu.open').forEach((m) => {
+        if (m !== restoreMenu) m.classList.remove('open');
+      });
+    });
+
+    restoreGroup.appendChild(restoreBtn);
+    restoreGroup.appendChild(restoreArrowBtn);
+    restoreGroup.appendChild(restoreMenu);
 
     // Delete button - removes session after user confirmation
     const deleteBtn = document.createElement('button');
@@ -332,12 +537,15 @@ function render() {
         showStatus(`Deleted "${session.name}".`, 'success');
         allSessions = await getSessions();
         render();
+        updateStorageMeter();
       } catch (err) {
         showStatus(err.message || 'Failed to delete session.', 'error');
       }
     });
 
-    actions.appendChild(restoreBtn);
+    actions.appendChild(restoreGroup);
+    actions.appendChild(renameBtn);
+    actions.appendChild(duplicateBtn);
     actions.appendChild(deleteBtn);
     header.appendChild(actions);
 
@@ -394,13 +602,36 @@ function render() {
         titleSpan.className = 'tab-preview-title';
         titleSpan.textContent = tab.title || tab.url || 'Untitled Tab';
 
-        tabItem.appendChild(titleSpan);
+        // Hover restore hint
+        const hintSpan = document.createElement('span');
+        hintSpan.className = 'tab-preview-hint';
+        hintSpan.textContent = 'Open tab';
 
-        // Optional: Clicking a single tab opens it
-        tabItem.addEventListener('click', (e) => {
+        tabItem.appendChild(titleSpan);
+        tabItem.appendChild(hintSpan);
+
+        tabItem.setAttribute('tabindex', '0');
+        tabItem.setAttribute('role', 'button');
+        tabItem.setAttribute('aria-label', `Restore tab: ${tab.title || 'Untitled Tab'}`);
+
+        // Restore single tab when clicked or activated via keyboard
+        const handleRestoreSingleTab = async (e) => {
           e.stopPropagation();
           if (tab.url) {
-            chrome.tabs.create({ url: tab.url });
+            try {
+              await chrome.tabs.create({ url: tab.url });
+              showStatus(`Opened "${tab.title || 'tab'}".`, 'success');
+            } catch (err) {
+              showStatus(err.message || 'Failed to open tab.', 'error');
+            }
+          }
+        };
+
+        tabItem.addEventListener('click', handleRestoreSingleTab);
+        tabItem.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleRestoreSingleTab(e);
           }
         });
 
@@ -430,6 +661,7 @@ async function handleSaveSession() {
     // Auto-expand newly saved session for instant confirmation
     expandedSessionIds.add(newSession.id);
     render();
+    updateStorageMeter();
   } catch (error) {
     showStatus(error.message || 'Failed to save session.', 'error');
   } finally {
@@ -474,6 +706,7 @@ async function handleImportFile(event) {
     await addImportedSessions(importedSessions);
     allSessions = await getSessions();
     render();
+    updateStorageMeter();
 
     let feedback = `Imported ${stats.sessionsImported} ${
       stats.sessionsImported === 1 ? 'session' : 'sessions'
@@ -558,6 +791,16 @@ async function init() {
       render();
     });
   });
+
+  // Global listener to close restore menus when clicking elsewhere
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.restore-menu.open').forEach((m) => {
+      m.classList.remove('open');
+    });
+  });
+
+  // Initial storage meter calculation
+  updateStorageMeter();
 }
 
 // Initialize when DOM is loaded
