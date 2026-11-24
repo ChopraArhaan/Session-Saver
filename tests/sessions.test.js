@@ -87,9 +87,7 @@ describe('sessions.js', () => {
       mock.tabs._setTabs([
         { id: 1, title: 'Chrome', url: 'chrome://version', windowId: 2 },
       ]);
-      await expect(saveCurrentSession('Empty', 2)).rejects.toThrow(
-        NoSavableTabsError,
-      );
+      await expect(saveCurrentSession('Empty', 2)).rejects.toThrow(NoSavableTabsError);
       await expect(saveCurrentSession('Empty', 2)).rejects.toThrow(
         'Internal browser pages',
       );

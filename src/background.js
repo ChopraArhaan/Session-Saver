@@ -53,7 +53,7 @@ export async function showBadgeFeedback(status = 'success') {
     badgeTimer = setTimeout(async () => {
       try {
         await chrome.action.setBadgeText({ text: '' });
-      } catch (err) {
+      } catch {
         // Safe to ignore if context invalidated
       } finally {
         badgeTimer = null;
@@ -179,89 +179,102 @@ export function scheduleSyncWindowSnapshots(delayMs = 1000) {
    (Required by Manifest V3 service worker lifecycle)
    ========================================================================== */
 
-// 1. Keyboard shortcuts
-if (chrome.commands?.onCommand?.addListener) {
-  chrome.commands.onCommand.addListener((command, tab) => {
-    if (command === 'save-session') {
-      handleSaveCommand(tab);
-    }
-  });
-}
+/**
+ * Registers all service worker listeners synchronously.
+ * Exported to allow clean attachment in test environments.
+ */
+export function registerBackgroundListeners() {
+  if (typeof chrome === 'undefined') {
+    return;
+  }
 
-// 2. Lifecycle hooks: clear badge text and sync snapshots
-if (chrome.runtime?.onStartup?.addListener) {
-  chrome.runtime.onStartup.addListener(async () => {
-    try {
-      await chrome.action.setBadgeText({ text: '' });
-    } catch {
-      // Ignore
-    }
-    syncWindowSnapshots();
-  });
-}
+  // 1. Keyboard shortcuts
+  if (chrome.commands?.onCommand?.addListener) {
+    chrome.commands.onCommand.addListener((command, tab) => {
+      if (command === 'save-session') {
+        handleSaveCommand(tab);
+      }
+    });
+  }
 
-if (chrome.runtime?.onInstalled?.addListener) {
-  chrome.runtime.onInstalled.addListener(async () => {
-    try {
-      await chrome.action.setBadgeText({ text: '' });
-    } catch {
-      // Ignore
-    }
-    syncWindowSnapshots();
-  });
-}
+  // 2. Lifecycle hooks: clear badge text and sync snapshots
+  if (chrome.runtime?.onStartup?.addListener) {
+    chrome.runtime.onStartup.addListener(async () => {
+      try {
+        await chrome.action.setBadgeText({ text: '' });
+      } catch {
+        // Ignore
+      }
+      syncWindowSnapshots();
+    });
+  }
 
-// 3. Tab mutation listeners to keep window snapshots fresh
-if (chrome.tabs?.onCreated?.addListener) {
-  chrome.tabs.onCreated.addListener(() => scheduleSyncWindowSnapshots());
-}
-if (chrome.tabs?.onUpdated?.addListener) {
-  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (changeInfo.status === 'complete' || changeInfo.url || changeInfo.title) {
-      scheduleSyncWindowSnapshots();
-    }
-  });
-}
-if (chrome.tabs?.onRemoved?.addListener) {
-  chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
-    // Skip snapshot updates when window is closing so closing windows aren't saved as empty
-    if (removeInfo && removeInfo.isWindowClosing) {
-      return;
-    }
-    scheduleSyncWindowSnapshots();
-  });
-}
-if (chrome.tabs?.onMoved?.addListener) {
-  chrome.tabs.onMoved.addListener(() => scheduleSyncWindowSnapshots());
-}
-if (chrome.tabs?.onAttached?.addListener) {
-  chrome.tabs.onAttached.addListener(() => scheduleSyncWindowSnapshots());
-}
-if (chrome.tabs?.onDetached?.addListener) {
-  chrome.tabs.onDetached.addListener(() => scheduleSyncWindowSnapshots());
-}
+  if (chrome.runtime?.onInstalled?.addListener) {
+    chrome.runtime.onInstalled.addListener(async () => {
+      try {
+        await chrome.action.setBadgeText({ text: '' });
+      } catch {
+        // Ignore
+      }
+      syncWindowSnapshots();
+    });
+  }
 
-// 4. Window removal listener for auto-save recovery
-if (chrome.windows?.onRemoved?.addListener) {
-  chrome.windows.onRemoved.addListener(async (windowId) => {
-    try {
-      const settings = await getSettings();
-      const removedTabs = await removeWindowSnapshot(windowId);
-
-      // Skip if setting is disabled or snapshot is missing
-      if (!settings.autoSave || !removedTabs || !Array.isArray(removedTabs)) {
+  // 3. Tab mutation listeners to keep window snapshots fresh
+  if (chrome.tabs?.onCreated?.addListener) {
+    chrome.tabs.onCreated.addListener(() => scheduleSyncWindowSnapshots());
+  }
+  if (chrome.tabs?.onUpdated?.addListener) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+      if (changeInfo.status === 'complete' || changeInfo.url || changeInfo.title) {
+        scheduleSyncWindowSnapshots();
+      }
+    });
+  }
+  if (chrome.tabs?.onRemoved?.addListener) {
+    chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+      // Skip snapshot updates when window is closing so closing windows aren't saved as empty
+      if (removeInfo && removeInfo.isWindowClosing) {
         return;
       }
+      scheduleSyncWindowSnapshots();
+    });
+  }
+  if (chrome.tabs?.onMoved?.addListener) {
+    chrome.tabs.onMoved.addListener(() => scheduleSyncWindowSnapshots());
+  }
+  if (chrome.tabs?.onAttached?.addListener) {
+    chrome.tabs.onAttached.addListener(() => scheduleSyncWindowSnapshots());
+  }
+  if (chrome.tabs?.onDetached?.addListener) {
+    chrome.tabs.onDetached.addListener(() => scheduleSyncWindowSnapshots());
+  }
 
-      const autoSession = createAutoSession(removedTabs);
-      if (autoSession) {
-        await saveAutoSession(autoSession);
+  // 4. Window removal listener for auto-save recovery
+  if (chrome.windows?.onRemoved?.addListener) {
+    chrome.windows.onRemoved.addListener(async (windowId) => {
+      try {
+        const settings = await getSettings();
+        const removedTabs = await removeWindowSnapshot(windowId);
+
+        // Skip if setting is disabled or snapshot is missing
+        if (!settings.autoSave || !removedTabs || !Array.isArray(removedTabs)) {
+          return;
+        }
+
+        const autoSession = createAutoSession(removedTabs);
+        if (autoSession) {
+          await saveAutoSession(autoSession);
+        }
+      } catch (err) {
+        console.error('Failed to auto-save closed window:', err);
       }
-    } catch (err) {
-      console.error('Failed to auto-save closed window:', err);
-    }
-  });
+    });
+  }
 }
 
-// Sync snapshots when service worker initializes
-syncWindowSnapshots();
+// Synchronously register listeners and sync snapshots when service worker evaluates
+registerBackgroundListeners();
+if (typeof chrome !== 'undefined') {
+  syncWindowSnapshots();
+}
